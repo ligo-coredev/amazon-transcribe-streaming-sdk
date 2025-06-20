@@ -89,15 +89,18 @@ class AwsCrtHttpResponse:
                 break
 
     def _on_headers(self, status_code: int, headers: HeadersList, **kwargs):
-        self._status_code_future.set_result(status_code)
-        self._headers_future.set_result(headers)
+        if not self._status_code_future.cancelled():
+            self._status_code_future.set_result(status_code)
+        if not self._headers_future.cancelled():
+            self._headers_future.set_result(headers)
 
     def _on_body(self, chunk: bytes, **kwargs):
         with self._chunk_lock:
             # TODO: update back pressure window
             if self._chunk_futures:
                 future = self._chunk_futures.pop(0)
-                future.set_result(chunk)
+                if not future.cancelled():
+                    future.set_result(chunk)
             else:
                 self._received_chunks.append(chunk)
 
@@ -105,7 +108,8 @@ class AwsCrtHttpResponse:
         with self._chunk_lock:
             if self._chunk_futures:
                 future = self._chunk_futures.pop(0)
-                future.set_result(b"")
+                if not future.cancelled():
+                    future.set_result(b"")
 
 
 class AwsCrtHttpSessionManager:
